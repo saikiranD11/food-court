@@ -1,41 +1,41 @@
+// foodcourt-ui/src/lib/api.ts
 const BASE = process.env.NEXT_PUBLIC_API_BASE!;
 
 async function http<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers||{}) } });
+  const res = await fetch(url, { 
+    ...init, 
+    headers: { 
+      "Content-Type": "application/json", 
+      ...(init?.headers||{}) 
+    } 
+  });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`${res.status} ${res.statusText}: ${text}`);
   }
   return res.json() as Promise<T>;
 }
-export type AuthOut = { user_token: string; user_id: number; email: string; display_name?: string };
 
+export type AuthOut = { user_token: string; user_id: number; email: string; display_name?: string };
 export type Vendor = { id: number; name: string; stall_no?: string | null };
 export type Menu = { id: number; vendor_id: number; item_name: string; price: string; is_active: boolean };
 export type CartItem = { id: number; vendor_id: number; menu_id: number; item_name: string; qty: number; price_each: string; line_total: string };
 export type Cart = { cart_id: number; user_token: string; items: CartItem[]; subtotal: string };
 export type CheckoutResp = { order_id: number; status: string; payable_amount: string; payment_link: string };
 export type OrderStatus = { order_id: number; status: string; total_gross: string };
-export type OrderLineBrief = {
-  vendor_name: string;
-  item_name: string;
-  qty: number;
-  line_total: string;
-};
+export type OrderLineBrief = { vendor_name: string; item_name: string; qty: number; line_total: string };
 export type OrderHistoryItem = {
   order_id: number;
   status: string;
   total_gross: string;
-  created_at: string;   // ISO
+  created_at: string;
   payment_id?: string | null;
   vendors: string[];
   lines: OrderLineBrief[];
 };
-export type OrderHistory = {
-  user_token: string;
-  orders: OrderHistoryItem[];
-};
+export type OrderHistory = { user_token: string; orders: OrderHistoryItem[] };
 
+// ============= Existing Customer API =============
 export const api = {
   vendors: () => http<Vendor[]>(`${BASE}/catalog/vendors`),
   menus: (vendor_id?: number) => {
@@ -50,9 +50,9 @@ export const api = {
   checkout: (user_token: string) =>
     http<CheckoutResp>(`${BASE}/checkout`, { method: "POST", body: JSON.stringify({ user_token }) }),
   orderStatus: (order_id: number) => http<OrderStatus>(`${BASE}/orders/${order_id}`),
-    history: (user_token: string) =>
+  history: (user_token: string) =>
     http<OrderHistory>(`${BASE}/orders/history?user_token=${encodeURIComponent(user_token)}`),
-signup: (email: string, password: string, display_name?: string, guest_token?: string) =>
+  signup: (email: string, password: string, display_name?: string, guest_token?: string) =>
     http<AuthOut>(`${BASE}/auth/signup`, {
       method: "POST",
       body: JSON.stringify({ email, password, display_name, guest_token }),
@@ -61,5 +61,59 @@ signup: (email: string, password: string, display_name?: string, guest_token?: s
     http<AuthOut>(`${BASE}/auth/login`, {
       method: "POST",
       body: JSON.stringify({ email, password, guest_token }),
+    }),
+};
+
+// ============= VENDOR PORTAL API =============
+export const vendorApi = {
+  // Dashboard & Statistics
+  getDashboard: (vendorId: number) =>
+    http<any>(`${BASE}/vendor/${vendorId}/dashboard`),
+  
+  getStats: (vendorId: number) =>
+    http<any>(`${BASE}/vendor/${vendorId}/stats`),
+  
+  getAnalytics: (vendorId: number, days: number = 7) =>
+    http<any>(`${BASE}/vendor/${vendorId}/analytics?days=${days}`),
+
+  // Orders Management
+  getOrders: (vendorId: number, status?: string, limit: number = 20) => {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    params.append('limit', String(limit));
+    return http<any[]>(`${BASE}/vendor/${vendorId}/orders?${params.toString()}`);
+  },
+
+  updateOrderStatus: (vendorId: number, orderId: number, status: string) =>
+    http<any>(`${BASE}/vendor/${vendorId}/orders/${orderId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status })
+    }),
+
+  // Menu Management
+  getMenu: (vendorId: number) =>
+    http<Menu[]>(`${BASE}/vendor/${vendorId}/menu`),
+
+  addMenuItem: (vendorId: number, item: { item_name: string; price: number; category?: string; is_active?: boolean }) =>
+    http<Menu>(`${BASE}/vendor/${vendorId}/menu`, {
+      method: "POST",
+      body: JSON.stringify(item)
+    }),
+
+  updateMenuPrice: (vendorId: number, menuId: number, price: number, is_active?: boolean) =>
+    http<Menu>(`${BASE}/vendor/${vendorId}/menu/${menuId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ price, is_active })
+    }),
+
+  toggleMenuAvailability: (vendorId: number, menuId: number, is_active: boolean) =>
+    http<Menu>(`${BASE}/vendor/${vendorId}/menu/${menuId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_active })
+    }),
+
+  deleteMenuItem: (vendorId: number, menuId: number) =>
+    http<{ deleted: boolean; menu_id: number }>(`${BASE}/vendor/${vendorId}/menu/${menuId}`, {
+      method: "DELETE"
     }),
 };

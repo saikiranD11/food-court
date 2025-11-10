@@ -63,6 +63,7 @@ class Order(Base):
     total_net = Column(Numeric(10,2), nullable=False, default=0)
     payment_id = Column(String)  # placeholder for future gateway
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    table_no = Column(String)  # e.g., "T-5", "T-12"
 
     lines = relationship("OrderLine", back_populates="order", cascade="all, delete-orphan")
 
@@ -75,6 +76,8 @@ class OrderLine(Base):
     qty = Column(Integer, nullable=False)
     price = Column(Numeric(10,2), nullable=False)
     tax = Column(Numeric(10,2), nullable=False, default=0)
+    prepared_at = Column(DateTime(timezone=True), nullable=True)
+    ready_at = Column(DateTime(timezone=True), nullable=True)
 
     order = relationship("Order", back_populates="lines")
     vendor = relationship("Vendor")
